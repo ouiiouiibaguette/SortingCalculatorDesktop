@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { getDashboardLogs, SortingLog, isDesktop } from "../lib/db";
+import { getDashboardLogs, SortingLog } from "../lib/db";
+import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -8,8 +9,6 @@ import { Download, Filter } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useTheme } from "../lib/theme-context";
 import * as ExcelJS from "exceljs";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
 import { calculateDashboardAnalytics, CopilMetrics } from "../lib/analytics";
 import { getCustomers, Customer } from "../lib/db";
 
@@ -108,7 +107,7 @@ export default function DashboardPage() {
             });
 
             if (filteredLogs.length === 0) {
-                alert("Aucune donnée à exporter pour cette période.");
+                toast.error("Aucune donnée à exporter pour cette période.");
                 return;
             }
 
@@ -117,30 +116,16 @@ export default function DashboardPage() {
                 const rows = filteredLogs.map(l => `${l.date_performed},${l.reference},${l.cadence_snapshot},${l.pieces_sorted},${l.hours_decimal}`).join("\n");
                 const content = header + rows;
 
-                if (isDesktop) {
-                    const filePath = await save({
-                        filters: [{ name: "CSV", extensions: ["csv"] }],
-                        defaultPath: `TriSuite_Dashboard_${exportStartDate}_to_${exportEndDate}.csv`
-                    });
-
-                    if (filePath) {
-                        const encoder = new TextEncoder();
-                        await writeFile(filePath, encoder.encode(content));
-                        alert("Fichier CSV exporté avec succès !");
-                        setExportModalOpen(false);
-                    }
-                } else {
-                    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.setAttribute('download', `TriSuite_Dashboard_${exportStartDate}_to_${exportEndDate}.csv`);
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    alert("Fichier CSV exporté avec succès !");
-                    setExportModalOpen(false);
-                }
+                const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `TriSuite_Dashboard_${exportStartDate}_to_${exportEndDate}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                toast.success("Fichier CSV exporté avec succès !");
+                setExportModalOpen(false);
             } else {
                 // Calculate COPIL metrics for the export period specifically
                 const allLogs = await getDashboardLogs(5000);
@@ -198,33 +183,20 @@ export default function DashboardPage() {
 
                 const buffer = await workbook.xlsx.writeBuffer();
 
-                if (isDesktop) {
-                    const filePath = await save({
-                        filters: [{ name: "Excel", extensions: ["xlsx"] }],
-                        defaultPath: `TriSuite_Dashboard_${exportStartDate}_to_${exportEndDate}.xlsx`
-                    });
-
-                    if (filePath) {
-                        await writeFile(filePath, new Uint8Array(buffer as ArrayBuffer));
-                        alert("Fichier Excel exporté avec succès !");
-                        setExportModalOpen(false);
-                    }
-                } else {
-                    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.setAttribute('download', `TriSuite_Dashboard_${exportStartDate}_to_${exportEndDate}.xlsx`);
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    alert("Fichier Excel exporté avec succès !");
-                    setExportModalOpen(false);
-                }
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `TriSuite_Dashboard_${exportStartDate}_to_${exportEndDate}.xlsx`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                toast.success("Fichier Excel exporté avec succès !");
+                setExportModalOpen(false);
             }
         } catch (err: any) {
             console.error(err);
-            alert("Erreur lors de l'export :\n" + (err.message || JSON.stringify(err)));
+            toast.error("Erreur lors de l'export :\n" + (err.message || JSON.stringify(err)));
         }
     };
 

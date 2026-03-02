@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { getSettings, updateSettings, Setting, isDesktop, exportMemoryDbToJson, importMemoryDbFromJson } from "../lib/db";
+import { getSettings, updateSettings, Setting, exportMemoryDbToJson, importMemoryDbFromJson } from "../lib/db";
+import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Save, Download, Upload, Moon, Sun } from "lucide-react";
-import { copyFile, BaseDirectory } from "@tauri-apps/plugin-fs";
-import { save, open, ask, message } from "@tauri-apps/plugin-dialog";
 import { useTheme } from "../lib/theme-context";
 
 export default function SettingsPage() {
@@ -41,6 +40,7 @@ export default function SettingsPage() {
         setSaving(true);
         try {
             await updateSettings(settings);
+            toast.success("Paramètres enregistrés");
         } catch (err) {
             console.error("Failed to save settings:", err);
         } finally {
@@ -52,35 +52,19 @@ export default function SettingsPage() {
         if (saving) return;
         setSaving(true);
         try {
-            if (isDesktop) {
-                const destPath = await save({
-                    filters: [{ name: "SQLite Database", extensions: ["db"] }],
-                    defaultPath: "sorting_backup.db"
-                });
-
-                if (destPath) {
-                    await copyFile("sorting.db", destPath, { fromPathBaseDir: BaseDirectory.AppData });
-                    await message("Sauvegarde exportée avec succès !", { title: "Succès", kind: "info" });
-                }
-            } else {
-                const jsonStr = exportMemoryDbToJson();
-                const blob = new Blob([jsonStr], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `SortingERP_Project_${new Date().toISOString().split('T')[0]}.json`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                alert("Projet sauvegardé avec succès !");
-            }
-        } catch (err) {
+            const jsonStr = await exportMemoryDbToJson();
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `SortingERP_Project_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success("Sauvegarde réussie !");
+        } catch (err: any) {
             console.error("Export failed:", err);
-            if (isDesktop) {
-                await message("Erreur lors de l'exportation : " + err, { title: "Erreur", kind: "error" });
-            } else {
-                alert("Erreur lors de l'exportation : " + err);
-            }
+            toast.error("Erreur lors de la sauvegarde : " + err.message);
         } finally {
             setSaving(false);
         }
@@ -89,61 +73,33 @@ export default function SettingsPage() {
     async function handleImportBackup() {
         if (saving) return;
         try {
-            if (isDesktop) {
-                const selected = await open({
-                    filters: [{ name: "SQLite Database", extensions: ["db"] }],
-                    multiple: false
-                });
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = async (e: Event) => {
+                const target = e.target as HTMLInputElement;
+                const file = target.files?.[0];
+                if (!file) return;
 
-                if (selected) {
-                    const confirmImport = await ask("Attention : Cela va écraser toutes vos données actuelles. Voulez-vous continuer ?", {
-                        title: "Confirmation d'importation",
-                        kind: "warning",
-                        okLabel: "Oui, importer",
-                        cancelLabel: "Annuler"
-                    });
+                const confirmImport = window.confirm("Attention : Cela va écraser vos données actuelles en mémoire. Continuer ?");
+                if (!confirmImport) return;
 
-                    if (!confirmImport) return;
-
-                    setSaving(true);
-                    await copyFile(selected as string, "sorting.db", { toPathBaseDir: BaseDirectory.AppData });
-                    await message("Importation réussie ! L'application va redémarrer.", { title: "Succès", kind: "info" });
-                    window.location.reload();
+                setSaving(true);
+                const text = await file.text();
+                const success = await importMemoryDbFromJson(text);
+                if (success) {
+                    toast.success("Données restaurées !");
+                    await loadSettings();
+                } else {
+                    toast.error("Fichier JSON invalide ou corrompu.");
                 }
-            } else {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.json';
-                input.onchange = async (e: Event) => {
-                    const target = e.target as HTMLInputElement;
-                    const file = target.files?.[0];
-                    if (!file) return;
-
-                    const confirmImport = window.confirm("Attention : Cela va écraser vos données actuelles en mémoire. Continuer ?");
-                    if (!confirmImport) return;
-
-                    setSaving(true);
-                    const text = await file.text();
-                    const success = importMemoryDbFromJson(text);
-                    if (success) {
-                        alert("Projet chargé avec succès !");
-                        await loadSettings();
-                    } else {
-                        alert("Erreur: Le fichier JSON est invalide ou corrompu.");
-                        setSaving(false);
-                    }
-                };
-                input.click();
-            }
-        } catch (err) {
+                setSaving(false);
+            };
+            input.click();
+        } catch (err: any) {
             console.error("Import failed:", err);
-            if (isDesktop) {
-                await message("Erreur lors de l'importation : " + err, { title: "Erreur", kind: "error" });
-            } else {
-                alert("Erreur: " + err);
-            }
-        } finally {
-            if (isDesktop) { setSaving(false); }
+            toast.error("Erreur: " + err.message);
+            setSaving(false);
         }
     }
 
@@ -255,14 +211,14 @@ export default function SettingsPage() {
                             <Download className="w-5 h-5" />
                             <div className="text-left">
                                 <div className="font-semibold text-slate-900 dark:text-white">Sauvegarder</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-normal">Exporter vers un fichier {isDesktop ? ".db" : ".json"}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-normal">Exporter vers un fichier .json</div>
                             </div>
                         </Button>
                         <Button type="button" variant="secondary" className="gap-2 h-16 border-dashed" onClick={handleImportBackup}>
                             <Upload className="w-5 h-5 text-primary" />
                             <div className="text-left">
                                 <div className="font-semibold text-slate-900 dark:text-white">Restaurer</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-normal">Importer un fichier {isDesktop ? ".db" : ".json"}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-normal">Importer un fichier .json</div>
                             </div>
                         </Button>
                     </CardContent>

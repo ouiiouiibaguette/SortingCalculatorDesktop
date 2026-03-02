@@ -1,8 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
-import { Calculator, Database, LayoutDashboard, Settings, Monitor, Globe, ChevronRight, TrendingUp } from "lucide-react";
-import { isDesktop } from "./lib/db";
-
-import CalculatorPage from "./pages/Calculator";
+import { Toaster } from 'sonner';
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { Calculator, Database, LayoutDashboard, Settings, Globe, ChevronRight, TrendingUp } from "lucide-react"; import CalculatorPage from "./pages/Calculator";
 import DatabasePage from "./pages/Database";
 import DashboardPage from "./pages/Dashboard";
 import SettingsPage from "./pages/Settings";
@@ -12,27 +11,35 @@ import { ThemeProvider } from "./lib/theme-context";
 export default function App() {
     return (
         <ThemeProvider>
-            <BrowserRouter>
-                <div className="flex h-screen bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 overflow-hidden relative transition-colors duration-300">
-                    <Sidebar />
+            <ErrorBoundary>
+                <BrowserRouter>
+                    <div className="flex h-screen bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 overflow-hidden relative transition-colors duration-300">
+                        <Sidebar />
 
-                    <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
-                        <Header />
+                        <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+                            <Header />
 
-                        <main className="flex-1 overflow-y-auto overflow-x-hidden relative p-4 sm:p-6 lg:p-8">
-                            <div className="max-w-[1600px] mx-auto">
-                                <Routes>
-                                    <Route path="/" element={<CalculatorPage />} />
-                                    <Route path="/majorations" element={<MajorationsPage />} />
-                                    <Route path="/database" element={<DatabasePage />} />
-                                    <Route path="/dashboard" element={<DashboardPage />} />
-                                    <Route path="/settings" element={<SettingsPage />} />
-                                </Routes>
-                            </div>
-                        </main>
+                            <main className="flex-1 overflow-y-auto overflow-x-hidden relative p-4 sm:p-6 lg:p-8">
+                                <div className="max-w-[1600px] mx-auto">
+                                    <Routes>
+                                        <Route path="/" element={<CalculatorPage />} />
+                                        <Route path="/majorations" element={<MajorationsPage />} />
+                                        <Route path="/database" element={<DatabasePage />} />
+                                        <Route path="/dashboard" element={<DashboardPage />} />
+                                        <Route path="/settings" element={<SettingsPage />} />
+                                    </Routes>
+                                </div>
+                            </main>
+                        </div>
                     </div>
-                </div>
-            </BrowserRouter>
+                    <Toaster
+                        position="bottom-right"
+                        toastOptions={{
+                            className: 'dark:bg-surface-dark dark:text-white dark:border-primary/20 bg-white text-slate-900 border-slate-200'
+                        }}
+                    />
+                </BrowserRouter>
+            </ErrorBoundary>
         </ThemeProvider>
     );
 }
@@ -48,17 +55,8 @@ function Header() {
 
             <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-primary/5 border border-slate-200 dark:border-primary/10">
-                    {isDesktop ? (
-                        <>
-                            <Monitor className="w-3.5 h-3.5 text-neon-accent" />
-                            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Desktop (SQLite)</span>
-                        </>
-                    ) : (
-                        <>
-                            <Globe className="w-3.5 h-3.5 text-blue-500" />
-                            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Web Portal (IndexedDB)</span>
-                        </>
-                    )}
+                    <Globe className="w-3.5 h-3.5 text-blue-500" />
+                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Web Portal (IndexedDB)</span>
                 </div>
             </div>
         </header>

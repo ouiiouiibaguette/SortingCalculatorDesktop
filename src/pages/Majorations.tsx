@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -12,10 +12,11 @@ import {
     generateId
 } from "../lib/db";
 import {
-    calculateFinanceProject,
     FinanceProjectInput,
-    FinancePremiumInput
+    FinancePremiumInput,
+    FinanceResults
 } from "../lib/financeCalculator";
+import { calculateFinanceProjectAsync } from "../lib/workerClient";
 
 const majorationsCatalog = [
     { type: "nuit", label: "Nuit", defPct: 25 },
@@ -72,13 +73,25 @@ export default function FinanceDashboard() {
     };
 
     // Derived Results
-    const { results, error } = useMemo(() => {
-        try {
-            const res = calculateFinanceProject(inputs);
-            return { results: res, error: null };
-        } catch (e: any) {
-            return { results: null, error: e.message };
-        }
+    const [results, setResults] = useState<FinanceResults | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    useEffect(() => {
+        let isMounted = true;
+        calculateFinanceProjectAsync(inputs)
+            .then(res => {
+                if (isMounted) {
+                    setResults(res);
+                    setError(null);
+                }
+            })
+            .catch(err => {
+                if (isMounted) {
+                    setResults(null);
+                    setError(err.message);
+                }
+            });
+
+        return () => { isMounted = false; };
     }, [inputs]);
 
     const handleSave = async () => {
